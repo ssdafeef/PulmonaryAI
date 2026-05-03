@@ -121,7 +121,7 @@ COVID-19-Detection-System/
 The COVID-19 Detection System uses the **COVID-19 Radiography Database** published by Tawsif ur Rahman on Kaggle.
 
 **Dataset Information:**
-- **Total Size:** ~70 GB
+- **Total Size:** ~780 MB
 - **Total Samples:** 21,165 X-ray images
 - **Classes:** COVID-19, Normal, Viral Pneumonia, Opacity
 - **Distribution:**
