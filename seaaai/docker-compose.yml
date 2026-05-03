@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  triton-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.triton
+    container_name: triton-covid-classifier
+    ports:
+      - "8000:8000"    # HTTP
+      - "8001:8001"    # gRPC
+      - "8002:8002"    # Metrics
+    volumes:
+      - ./model_repository:/models
+    environment:
+      - LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
+    command: tritonserver --model-repository=/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Uncomment for GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    networks:
+      - covid-network
+
+  api-client:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.client
+    container_name: covid-api-client
+    ports:
+      - "8011:8001"
+    depends_on:
+      triton-server:
+        condition: service_healthy
+    environment:
+      - MODEL_PATH=/models/covid_classifier/1/attention_resnet_covid_classifier.keras
+      - PORT=8001
+      - GEMINI_BASE_URL=${GEMINI_BASE_URL:-https://generativelanguage.googleapis.com/v1beta}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-flash-latest}
+      - GEMINI_TIMEOUT=${GEMINI_TIMEOUT:-25}
+    volumes:
+      - ./backend:/app
+      - ./model_repository:/models
+    command: python app.py
+    networks:
+      - covid-network
+
+  frontend:
+    build:
+      context: ./covid-frontend
+      args:
+        - REACT_APP_API_URL=http://localhost:8011
+    container_name: covid-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-client
+    environment:
+      - REACT_APP_API_URL=http://localhost:8011
+    volumes:
+      - ./covid-frontend:/app
+    networks:
+      - covid-network
+
+networks:
+  covid-network:
+    driver: bridge
